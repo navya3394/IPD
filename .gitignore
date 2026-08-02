@@ -1,0 +1,19 @@
+# Ignore virtual environment
+.venv/
+# Ignore Python compiled files
+__pycache__/
+*.pyc
+# Ignore dataset and large files
+C6/
+appendix/
+image_enhance/
+Context/
+# Ignore large binaries and archives
+*.zip
+*.part
+*.mp4
+*.pt
+# Ignore OS files
+.DS_Store
+Thumbs.db
+*.placeholder

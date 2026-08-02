@@ -1,0 +1,6 @@
+# Common dependencies for the IPD project
+numpy
+opencv-python
+torch
+ultralytics
+brisque
