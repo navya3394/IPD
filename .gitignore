@@ -4,7 +4,7 @@
 __pycache__/
 *.pyc
 # Ignore dataset and large files
-C6/
+c6/Test/
 appendix/
 image_enhance/
 Context/
@@ -13,6 +13,7 @@ Context/
 *.part
 *.mp4
 *.pt
+*.png
 # Ignore OS files
 .DS_Store
 Thumbs.db
