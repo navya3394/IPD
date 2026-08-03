@@ -28,7 +28,12 @@ import time
 from collections import defaultdict
 from typing import List, Dict, Tuple
 
-import cv2
+try:
+    import cv2
+    _has_cv2 = True
+except ImportError:
+    print("[WARNING] opencv-python (cv2) not installed – tracker demo will not run.")
+    _has_cv2 = False
 import numpy as np
 
 # Import the C3 detector for the demo CLI.
@@ -181,9 +186,17 @@ def _draw_tracks(frame: np.ndarray, detections: List[Dict], id_colors: Dict[int,
 
 def _run_demo(video_path: str) -> None:
     if PersonDetector is None:
-        raise RuntimeError("C3 PersonDetector could not be imported – ensure C3 is built.")
-    detector = PersonDetector()
+        print("[WARNING] C3 PersonDetector not available – using dummy detector (no detections).")
+        class DummyDetector:
+            def detect(self, frame):
+                return []  # no detections
+        detector = DummyDetector()
+    else:
+        detector = PersonDetector()
     tracker = PersonTracker()
+    if not _has_cv2:
+        print("[WARNING] opencv-python (cv2) not available – cannot run video processing demo.")
+        return
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise FileNotFoundError(f"Unable to open video file: {video_path}")

@@ -38,12 +38,7 @@ from ultralytics import YOLO
 
 # Import the C3 detector – relative import works because both c3 and c4 are
 # top‑level packages in the repository.
-try:
-    from c3.detector import PersonDetector
-except Exception as e:  # pragma: no cover – will be caught at runtime if missing
-    PersonDetector = None
-    print("[WARNING] C3 detector could not be imported – demo will fail if used.", e)
-
+from c3.detector import PersonDetector
 
 class PoseEstimator:
     """Wraps a YOLOv8 pose model.
