@@ -122,29 +122,27 @@ class PoseEstimator:
                     pose_res = self.model.predict(source=roi_rgb, verbose=False)[0]
                     # The model returns keypoints relative to the ROI.
                     # Safely handle keypoints extraction across Ultralytics versions
-                    if pose_res.keypoints is not None and getattr(pose_res.keypoints, 'has_visible', True):
+                    if pose_res.keypoints is not None and len(pose_res.keypoints) > 0:
                         kp_array = None
                         # Prefer .xy/.conf if available (newer versions)
                         if hasattr(pose_res.keypoints, 'xy') and hasattr(pose_res.keypoints, 'conf'):
                             try:
                                 xy = pose_res.keypoints.xy[0].cpu().numpy()
                                 conf = pose_res.keypoints.conf[0].cpu().numpy().reshape(-1, 1)
-                                kp_array = np.hstack([xy, conf])
+                                if xy.shape == (17, 2) and conf.shape == (17, 1):
+                                    kp_array = np.hstack([xy, conf])
                             except Exception:
                                 kp_array = None
                         # Fallback to .data tensor
                         if kp_array is None and hasattr(pose_res.keypoints, 'data'):
                             try:
-                                kp_array = pose_res.keypoints.data[0].cpu().numpy()
+                                data = pose_res.keypoints.data[0].cpu().numpy()
+                                if data.shape == (17, 3):
+                                    kp_array = data
                             except Exception:
                                 kp_array = None
-                        # Final fallback: convert the object directly to numpy if possible
-                        if kp_array is None:
-                            try:
-                                kp_array = np.array(pose_res.keypoints)
-                            except Exception:
-                                kp_array = None
-                        if kp_array is None:
+                        # Final fallback: if kp_array is missing or does not have correct dimensions/shape, fill with zeros
+                        if kp_array is None or kp_array.ndim != 2 or kp_array.shape != (17, 3):
                             kp_array = np.zeros((17, 3))
                         # Translate coordinates back to the original frame.
                         kp_array[:, 0] += x1

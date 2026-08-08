@@ -111,7 +111,7 @@ class PersonTracker:
             ]
             flat.sort(key=lambda x: x[2], reverse=True)
             for ti, di, _ in flat:
-                if ti in matched_tracks or di in matched_dets:
+                if track_ids[ti] in matched_tracks or di in matched_dets:
                     continue
                 matched_tracks[track_ids[ti]] = di
                 matched_dets.add(di)

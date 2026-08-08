@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+}
+
+body{
+
+  font-family: Inter, Arial, Helvetica, sans-serif;
+
+  background: linear-gradient(
+      135deg,
+      #020617 0%,
+      #0F172A 45%,
+      #111827 100%
+  );
+
+  color:white;
+
+  overflow:hidden;
+
+}
+
+::-webkit-scrollbar{
+    width:8px;
+}
+
+::-webkit-scrollbar-thumb{
+    background:#334155;
+    border-radius:10px;
+}
+
+::-webkit-scrollbar-track{
+    background:#0F172A;
+}

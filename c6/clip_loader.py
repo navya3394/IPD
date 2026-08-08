@@ -36,15 +36,38 @@ if _has_torchvision:
         T.ToTensor(),
         T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
+    # Kinetics normalization (mean=0.45, std=0.225) used by the SlowFast binary classifier
+    KINETICS_TRANSFORM = T.Compose([
+        T.ToPILImage(),
+        T.Resize((224, 224)),
+        T.ToTensor(),
+        T.Normalize(mean=[0.45, 0.45, 0.45], std=[0.225, 0.225, 0.225])
+    ])
 else:
     CLIP_TRANSFORM = None
+    KINETICS_TRANSFORM = None
 
-def load_clip(video_path: str, start_frame: int, num_frames: int = 16, size: int = 224) -> torch.Tensor:
+def load_clip(video_path: str, start_frame: int, num_frames: int = 16, size: int = 224, transform_variant: str = "imagenet") -> torch.Tensor:
     """Load a clip of ``num_frames`` from ``video_path`` starting at ``start_frame``.
+
+    Parameters
+    ----------
+    video_path: str
+        Path to the video file.
+    start_frame: int
+        Index of the first frame to read.
+    num_frames: int, default 16
+        Number of frames to extract. The binary classifier will request 32.
+    size: int, default 224
+        Spatial size after resizing.
+    transform_variant: str, default "imagenet"
+        Which normalization pipeline to use:
+        * "imagenet" – ImageNet mean/std (default, used by the rest of the project).
+        * "kinetics" – Kinetics mean/std required by the SlowFast binary model.
 
     The function tries to use decord first; if decord is unavailable or fails,
     it falls back to ``cv2.VideoCapture``. Frames are converted to RGB, transformed
-    with a shared torchvision pipeline, and stacked into a tensor of shape
+    with the selected torchvision pipeline, and stacked into a tensor of shape
     ``(num_frames, 3, size, size)``.
     """
     if num_frames <= 0:
@@ -66,8 +89,14 @@ def load_clip(video_path: str, start_frame: int, num_frames: int = 16, size: int
             for idx in range(start_frame, start_frame + num_frames):
                 frame = vr[idx].asnumpy()
                 img = torch.from_numpy(frame).permute(2, 0, 1).float() / 255.0
-                if CLIP_TRANSFORM:
-                    img = CLIP_TRANSFORM(img)
+                if transform_variant == "imagenet":
+                    if CLIP_TRANSFORM:
+                        img = CLIP_TRANSFORM(img)
+                elif transform_variant == "kinetics":
+                    if KINETICS_TRANSFORM:
+                        img = KINETICS_TRANSFORM(img)
+                else:
+                    raise ValueError(f"Unsupported transform_variant: {transform_variant}")
                 frames.append(img)
             backend = "decord"
         except Exception as e:
@@ -78,29 +107,35 @@ def load_clip(video_path: str, start_frame: int, num_frames: int = 16, size: int
     if backend is None:
         if not _has_cv2:
             raise RuntimeError("opencv-python (cv2) not installed – cannot read video via cv2 fallback.")
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise RuntimeError(f"Failed to open video with cv2: {video_path}")
-    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    if start_frame + num_frames > total:
-        cap.release()
-        raise RuntimeError(
-            f"Not enough frames from start_frame; required {num_frames}, got {total - start_frame}"
-        )
-    cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
-    for _ in range(num_frames):
-        ret, frame = cap.read()
-        if not ret:
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            raise RuntimeError(f"Failed to open video with cv2: {video_path}")
+        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if start_frame + num_frames > total:
             cap.release()
-            raise RuntimeError("Failed to read frame from cv2")
-        # Convert BGR to RGB
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        img = torch.from_numpy(frame).permute(2, 0, 1).float() / 255.0
-        if CLIP_TRANSFORM:
-            img = CLIP_TRANSFORM(img)
-        frames.append(img)
-    cap.release()
-    backend = "cv2"
+            raise RuntimeError(
+                f"Not enough frames from start_frame; required {num_frames}, got {total - start_frame}"
+            )
+        cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+        for _ in range(num_frames):
+            ret, frame = cap.read()
+            if not ret:
+                cap.release()
+                raise RuntimeError("Failed to read frame from cv2")
+            # Convert BGR to RGB
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            img = torch.from_numpy(frame).permute(2, 0, 1).float() / 255.0
+            if transform_variant == "imagenet":
+                if CLIP_TRANSFORM:
+                    img = CLIP_TRANSFORM(img)
+            elif transform_variant == "kinetics":
+                if KINETICS_TRANSFORM:
+                    img = KINETICS_TRANSFORM(img)
+            else:
+                raise ValueError(f"Unsupported transform_variant: {transform_variant}")
+            frames.append(img)
+        cap.release()
+        backend = "cv2"
 
     print(f"Backend used: {backend}")
     clip_tensor = torch.stack(frames)  # (num_frames, 3, size, size)
@@ -134,14 +169,19 @@ class ClipManifestDataset(Dataset):
 # ---------------------------------------------------------------------------
 # Simple CLI sanity‑check
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Simple CLI sanity‑check
+# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python clip_loader.py <video_path> [start_frame]")
+        print("Usage: python clip_loader.py <video_path> [start_frame] [transform_variant]")
         sys.exit(1)
     video_path = sys.argv[1]
     start = int(sys.argv[2]) if len(sys.argv) > 2 else 0
+    # Default to ImageNet transforms for backward compatibility; user can pass "kinetics".
+    variant = sys.argv[3] if len(sys.argv) > 3 else "imagenet"
     try:
-        clip = load_clip(video_path, start)
+        clip = load_clip(video_path, start, transform_variant=variant)
         print(f"Loaded clip tensor shape: {clip.shape}")
     except Exception as exc:
         print(f"Error loading clip: {exc}")

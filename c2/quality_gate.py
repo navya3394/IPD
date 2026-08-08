@@ -38,7 +38,8 @@ class QualityGate:
 
         # Instantiate model objects once (BRISQUE needs a model instance, PIQE does not).
         if self.method == "brisque":
-            self._brisque = BRISQUEQualityGate()
+            from brisque import BRISQUE
+            self._brisque = BRISQUE(url=False)
         else:
             self._brisque = None
         # No persistent state needed for PIQE.
@@ -123,6 +124,8 @@ class QualityGate:
         """Return the latency (in ms) of the most recent ``process`` call."""
         return self.last_latency_ms
 
+
+if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python quality_gate.py <folder_path>")
         sys.exit(1)
@@ -171,3 +174,4 @@ class QualityGate:
     print(f"Total images processed: {total}")
     print(f"BRISQUE – % flagged poor: {br_poor / total * 100:.2f}% , avg latency: {avg_br:.2f} ms")
     print(f"PIQE   – % flagged poor: {pi_poor / total * 100:.2f}% , avg latency: {avg_pi:.2f} ms")
+
